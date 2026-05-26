@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recovarr</title>
+<style>
+/* ── Theme ──────────────────────────────────────────── */
+:root {
+  --bg:        #0f1117;
+  --surface:   #1a1d27;
+  --surface2:  #252836;
+  --border:    #2e3245;
+  --accent:    #7c6af7;
+  --text:      #e2e4ef;
+  --muted:     #7880a0;
+  --success:   #4caf7d;
+  --warning:   #e8a93a;
+  --error:     #e85858;
+  --info:      #4ab8e8;
+  --watching:  #c97af7;
+  --restored:  #5cdb95;
+  --radius:    10px;
+  --mono:      'JetBrains Mono','Fira Code','Consolas',monospace;
+  --ui:        system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:       #f0f2f8;
+    --surface:  #ffffff;
+    --surface2: #e8eaf2;
+    --border:   #cdd0e0;
+    --accent:   #5a4fcf;
+    --text:     #1a1d2e;
+    --muted:    #6068a0;
+  }
+}
+
+/* ── Reset ──────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--ui);background:var(--bg);color:var(--text);min-height:100vh;padding:1rem 1rem 3rem}
+
+/* ── Layout ─────────────────────────────────────────── */
+.wrap{max-width:860px;margin:0 auto}
+h1{font-size:1.25rem;font-weight:600;margin-bottom:1.25rem;display:flex;align-items:center;gap:.5rem}
+h1 .badge{font-size:.65rem;font-weight:600;background:#3d3580;color:#a89af7;border-radius:20px;padding:.2rem .6rem;text-transform:uppercase;letter-spacing:.05em}
+
+/* ── Card ───────────────────────────────────────────── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1rem}
+label{display:block;font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem}
+textarea{width:100%;min-height:80px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:.8rem;padding:.6rem .7rem;resize:vertical;outline:none;line-height:1.5}
+textarea:focus{border-color:var(--accent)}
+textarea::placeholder{color:var(--muted);opacity:.6}
+.row{display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap;align-items:center}
+.hint{font-size:.75rem;color:var(--muted);margin-left:auto}
+
+/* ── Buttons ────────────────────────────────────────── */
+button{font-family:var(--ui);font-size:.85rem;font-weight:600;border:none;border-radius:6px;padding:.5rem 1.1rem;cursor:pointer;transition:opacity .15s,transform .1s}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){opacity:.85}
+.btn-ghost{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text)}
+.btn-warn{background:color-mix(in srgb,var(--warning) 15%,var(--surface));color:var(--warning);border:1px solid var(--warning)}
+.btn-warn:hover{background:color-mix(in srgb,var(--warning) 25%,var(--surface))}
+.btn-sm{font-size:.75rem;padding:.3rem .75rem}
+
+/* ── Queue header ───────────────────────────────────── */
+.qh{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
+.qh h2{font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--muted);font-size:.9rem}
+
+/* ── Job card ───────────────────────────────────────── */
+.job{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:.65rem;overflow:hidden}
+.job.queued   {border-left:3px solid var(--muted)}
+.job.running  {border-left:3px solid var(--info)}
+.job.watching {border-left:3px solid var(--watching)}
+.job.restored {border-left:3px solid var(--restored)}
+.job.done     {border-left:3px solid var(--success)}
+.job.failed   {border-left:3px solid var(--error)}
+.job.timeout  {border-left:3px solid var(--warning)}
+
+/* ── Job header ─────────────────────────────────────── */
+.jh{display:flex;align-items:center;gap:.6rem;padding:.6rem .85rem;cursor:pointer;user-select:none}
+.jh:hover{background:var(--surface2)}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.job.queued   .dot{background:var(--muted)}
+.job.running  .dot{background:var(--info);animation:pulse 1s infinite}
+.job.watching .dot{background:var(--watching);animation:pulse 1.5s infinite}
+.job.restored .dot{background:var(--restored)}
+.job.done     .dot{background:var(--success)}
+.job.failed   .dot{background:var(--error)}
+.job.timeout  .dot{background:var(--warning)}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.jmeta{flex:1;min-width:0}
+.jtitle{font-weight:600;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jsub{font-size:.72rem;color:var(--muted);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:.1rem}
+.jstatus{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0}
+.job.queued   .jstatus{color:var(--muted)}
+.job.running  .jstatus{color:var(--info)}
+.job.watching .jstatus{color:var(--watching)}
+.job.restored .jstatus{color:var(--restored)}
+.job.done     .jstatus{color:var(--success)}
+.job.failed   .jstatus{color:var(--error)}
+.job.timeout  .jstatus{color:var(--warning)}
+.jtoggle{color:var(--muted);font-size:.7rem;flex-shrink:0}
+
+/* ── Remediation panel ──────────────────────────────── */
+.remedy{display:none;padding:.65rem .85rem;background:color-mix(in srgb,var(--surface2) 60%,var(--surface));border-top:1px solid var(--border);gap:.5rem;flex-wrap:wrap;align-items:center;font-size:.8rem;color:var(--muted)}
+.remedy.visible{display:flex}
+.remedy-msg{flex:1;min-width:160px}
+
+/* ── Log pane ───────────────────────────────────────── */
+.jlog{display:none;background:var(--surface2);border-top:1px solid var(--border);padding:.7rem;font-family:var(--mono);font-size:.72rem;line-height:1.6;max-height:260px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
+.jlog.open{display:block}
+.l-ok{color:var(--success)}.l-err{color:var(--error)}.l-warn{color:var(--warning)}
+.l-step{color:var(--accent)}.l-info{color:var(--info)}.l-watch{color:var(--watching)}.l-def{color:var(--text)}
+
+/* ── History section ─────────────────────────────── */
+.hist-header{display:flex;align-items:center;justify-content:space-between;margin:1.5rem 0 .5rem;cursor:pointer;user-select:none}
+.hist-header h2{font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.hist-toggle{font-size:.75rem;color:var(--muted);padding:.2rem .5rem}
+.hist-empty{text-align:center;padding:1.5rem 1rem;color:var(--muted);font-size:.85rem}
+.job.archived{opacity:.55}
+.job.archived:hover{opacity:.8;transition:opacity .15s}
+.arch-tag{font-size:.6rem;font-weight:600;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:.1rem .4rem;flex-shrink:0;text-transform:uppercase;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Recovarr <span class="badge">recovarr</span></h1>
+
+  <div class="card">
+    <label for="paths">File path(s) — one per line</label>
+    <textarea id="paths"
+      placeholder="/Library/Series/Show/Season 01/Episode.mkv&#10;/Library/Movies/Movie (2024)/Movie.mkv"
+      spellcheck="false" autocorrect="off" autocapitalize="off"></textarea>
+    <div class="row">
+      <button class="btn-primary" id="submit-btn" onclick="submitPaths()">Queue Recovery</button>
+      <button class="btn-ghost" onclick="document.getElementById('paths').value=''">Clear</button>
+      <span class="hint" id="hint"></span>
+    </div>
+  </div>
+
+  <div class="qh">
+    <h2>Queue</h2>
+    <button class="btn-ghost btn-sm" onclick="clearDone()">Clear done</button>
+  </div>
+  <div id="list">
+    <div class="empty" id="empty">No jobs yet — paste a file path above</div>
+  </div>
+
+  <div class="hist-header" id="hist-header" onclick="toggleHistory()">
+    <h2>History <span id="hist-count"></span></h2>
+    <span class="hist-toggle" id="hist-toggle">▾ Show</span>
+  </div>
+  <div id="hist-list" style="display:none">
+    <div class="hist-empty" id="hist-empty">No archived jobs</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── State ────────────────────────────────────────────
+// id → { el, logEl, remedyEl, open }
+const state = new Map();
+
+const STATUS_LABEL = {
+  queued:   'Queued',
+  running:  'Searching…',
+  watching: 'Waiting for download…',
+  restored: 'Restored',
+  done:     'Done',
+  failed:   'Failed',
+  timeout:  'Timed out',
+};
+
+const REMEDY = {
+  failed:  { msg: 'Search failed or API error.', actions: ['retry', 'sonarr'] },
+  timeout: { msg: 'No download detected after 24h. Indexers may have no results.', actions: ['retry', 'sonarr'] },
+};
+
+// ── API ──────────────────────────────────────────────
+const api = {
+  post: (u, b) => fetch(u, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(b) }).then(r=>r.json()),
+  get:  (u)    => fetch(u).then(r=>r.json()),
+  del:  (u)    => fetch(u, { method:'DELETE' }),
+};
+
+// ── Submit ───────────────────────────────────────────
+async function submitPaths() {
+  const raw = document.getElementById('paths').value;
+  const paths = raw.split('\n').map(s=>s.trim()).filter(Boolean);
+  if (!paths.length) return;
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  document.getElementById('hint').textContent = `Queuing ${paths.length}…`;
+  try {
+    const res = await api.post('/api/recover', { paths });
+    if (res.jobs) {
+      res.jobs.forEach(addCard);
+      document.getElementById('paths').value = '';
+    }
+  } finally {
+    btn.disabled = false;
+    document.getElementById('hint').textContent = '';
+    syncEmpty();
+  }
+}
+
+// ── Path helpers ─────────────────────────────────────
+function splitPath(p) {
+  const parts = p.replace(/\\/g,'/').split('/');
+  const file = parts.pop() || '';
+  return { dir: parts.join('/')+'/'+'\u200b', file };
+}
+
+function titleFromWatch(watchData) {
+  return watchData?.title || null;
+}
+
+// ── Build card ───────────────────────────────────────
+function addCard(job, archived = false) {
+  const { dir, file } = splitPath(job.filepath);
+  const title = titleFromWatch(job.watchData) || file;
+
+  const el = document.createElement('div');
+  el.className = `job ${job.status}${archived ? ' archived' : ''}`;
+  el.dataset.id = job.id;
+
+  // Header
+  const jh = document.createElement('div');
+  jh.className = 'jh';
+  jh.addEventListener('click', () => toggleLog(job.id));
+
+  const dot = document.createElement('div'); dot.className = 'dot';
+
+  const meta = document.createElement('div'); meta.className = 'jmeta';
+  const jtitle = document.createElement('div'); jtitle.className = 'jtitle'; jtitle.textContent = title;
+  const jsub   = document.createElement('div'); jsub.className   = 'jsub';   jsub.textContent = dir + file;
+  meta.appendChild(jtitle); meta.appendChild(jsub);
+
+  const jstatus = document.createElement('span'); jstatus.className = 'jstatus';
+  jstatus.textContent = STATUS_LABEL[job.status] || job.status;
+
+  const toggle = document.createElement('span'); toggle.className = 'jtoggle'; toggle.textContent = '▾';
+
+  jh.appendChild(dot); jh.appendChild(meta); jh.appendChild(jstatus);
+  if (archived) {
+    const tag = document.createElement('span'); tag.className = 'arch-tag'; tag.textContent = 'archived';
+    jh.appendChild(tag);
+  }
+  jh.appendChild(toggle);
+
+  // Remedy panel (hidden until needed)
+  const remedy = document.createElement('div'); remedy.className = 'remedy';
+  const remedyMsg = document.createElement('span'); remedyMsg.className = 'remedy-msg';
+  remedy.appendChild(remedyMsg);
+
+  // Log pane
+  const logEl = document.createElement('div'); logEl.className = 'jlog';
+
+  el.appendChild(jh); el.appendChild(remedy); el.appendChild(logEl);
+
+  const container = archived
+    ? document.getElementById('hist-list')
+    : document.getElementById('list');
+  container.insertBefore(el, container.firstChild);
+
+  state.set(job.id, { el, logEl, remedyEl: remedy, remedyMsg, open: false });
+
+  if (archived) {
+    // Archived jobs load their saved lines directly — no live SSE needed
+    api.get(`/api/jobs/${job.id}`).then(full => {
+      if (full?.lines) full.lines.forEach(l => appendLine(job.id, l));
+    }).catch(() => {});
+    showRemedy(job.id, job.status, job.watchData);
+  } else {
+    streamJob(job);
+  }
+}
+
+// ── Remediation panel ────────────────────────────────
+function showRemedy(id, status, watchData) {
+  const s = state.get(id);
+  if (!s) return;
+  const r = REMEDY[status];
+  if (!r) return;
+  s.remedyMsg.textContent = r.msg;
+  s.remedyEl.classList.add('visible');
+  for (const action of r.actions) {
+    if (s.remedyEl.querySelector(`[data-action="${action}"]`)) continue;
+    const btn = document.createElement('button');
+    btn.dataset.action = action;
+    if (action === 'retry') {
+      btn.className = 'btn-warn btn-sm';
+      btn.textContent = 'Retry search';
+      btn.addEventListener('click', (e) => { e.stopPropagation(); retryJob(id); });
+    } else if (action === 'sonarr') {
+      btn.className = 'btn-ghost btn-sm';
+      btn.textContent = 'Open Sonarr';
+      btn.addEventListener('click', (e) => { e.stopPropagation(); window.open('http://10.1.10.71:8989/sonarr', '_blank'); });
+    }
+    s.remedyEl.appendChild(btn);
+  }
+}
+
+// ── Update card status ───────────────────────────────
+function setStatus(id, status, watchData) {
+  const s = state.get(id);
+  if (!s) return;
+  s.el.className = `job ${status}`;
+  s.el.querySelector('.jstatus').textContent = STATUS_LABEL[status] || status;
+  if (watchData?.title) s.el.querySelector('.jtitle').textContent = watchData.title;
+  showRemedy(id, status, watchData);
+}
+
+// ── Log line ─────────────────────────────────────────
+function appendLine(id, line) {
+  const s = state.get(id);
+  if (!s) return;
+  const span = document.createElement('span');
+  span.className = classifyLine(line);
+  span.textContent = line + '\n';
+  s.logEl.appendChild(span);
+  if (s.open) s.logEl.scrollTop = s.logEl.scrollHeight;
+}
+
+function classifyLine(l) {
+  if (l.includes('[OK]') || l.includes('SUCCESS')) return 'l-ok';
+  if (l.includes('[ERR]'))   return 'l-err';
+  if (l.includes('[WARN]'))  return 'l-warn';
+  if (l.includes('[-->]'))   return 'l-step';
+  if (l.includes('[WATCH]')) return 'l-watch';
+  if (l.includes('[INFO]'))  return 'l-info';
+  return 'l-def';
+}
+
+// ── Toggle log ───────────────────────────────────────
+function toggleLog(id) {
+  const s = state.get(id);
+  if (!s) return;
+  s.open = !s.open;
+  s.logEl.classList.toggle('open', s.open);
+  s.el.querySelector('.jtoggle').textContent = s.open ? '▴' : '▾';
+  if (s.open) s.logEl.scrollTop = s.logEl.scrollHeight;
+}
+
+// ── SSE ──────────────────────────────────────────────
+function streamJob(job) {
+  const es = new EventSource(`/api/jobs/${job.id}/stream`);
+
+  es.onmessage = (e) => {
+    try { appendLine(job.id, JSON.parse(e.data)); }
+    catch { appendLine(job.id, e.data); }
+  };
+
+  es.addEventListener('watching', (e) => {
+    const d = safeJson(e.data);
+    setStatus(job.id, 'watching', d?.watchData);
+  });
+
+  es.addEventListener('done', (e) => {
+    const d = safeJson(e.data) || {};
+    setStatus(job.id, d.status || (d.exitCode === 0 ? 'done' : 'failed'), d.watchData);
+    es.close();
+    syncEmpty();
+  });
+
+  es.onerror = () => {
+    api.get(`/api/jobs/${job.id}`).then(j => {
+      if (j?.status && !['running','watching','queued'].includes(j.status)) {
+        setStatus(job.id, j.status, j.watchData);
+        es.close();
+      }
+    }).catch(()=>{});
+  };
+}
+
+// ── Retry ────────────────────────────────────────────
+async function retryJob(id) {
+  const res = await api.post(`/api/jobs/${id}/retry`, {});
+  if (res.id) {
+    // Hide remedy panel on original
+    const s = state.get(id);
+    if (s) s.remedyEl.classList.remove('visible');
+    addCard(res);
+    syncEmpty();
+  }
+}
+
+// ── Clear ────────────────────────────────────────────
+async function clearDone() {
+  const jobs = await api.get('/api/jobs').catch(()=>[]);
+  for (const job of (Array.isArray(jobs) ? jobs : [])) {
+    if (['done','restored','failed','timeout'].includes(job.status)) {
+      await api.del(`/api/jobs/${job.id}`);
+      const el = document.querySelector(`[data-id="${job.id}"]`);
+      if (el) el.remove();
+      state.delete(job.id);
+    }
+  }
+  syncEmpty();
+  syncHistory();
+}
+
+// ── History toggle ───────────────────────────────────
+function toggleHistory() {
+  const list = document.getElementById('hist-list');
+  const toggle = document.getElementById('hist-toggle');
+  const visible = list.style.display !== 'none';
+  list.style.display = visible ? 'none' : 'block';
+  toggle.textContent = visible ? '▾ Show' : '▴ Hide';
+}
+
+function syncHistory() {
+  const cards = document.getElementById('hist-list').querySelectorAll('.job');
+  const count = cards.length;
+  document.getElementById('hist-count').textContent = count ? `(${count})` : '';
+  document.getElementById('hist-empty').style.display = count ? 'none' : '';
+  document.getElementById('hist-header').style.display = '';
+}
+
+function syncEmpty() {
+  const has = document.getElementById('list').querySelectorAll('.job').length > 0;
+  document.getElementById('empty').style.display = has ? 'none' : '';
+}
+
+// ── Init ─────────────────────────────────────────────
+async function init() {
+  const jobs = await api.get('/api/jobs').catch(()=>[]);
+  if (!Array.isArray(jobs)) { syncEmpty(); return; }
+
+  const live     = jobs.filter(j => !j.archived).slice().reverse();
+  const archived = jobs.filter(j =>  j.archived).slice().reverse();
+
+  live.forEach(j => addCard(j, false));
+  archived.forEach(j => addCard(j, true));
+
+  syncEmpty();
+  syncHistory();
+}
+
+function safeJson(s) { try { return JSON.parse(s); } catch { return null; } }
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitPaths();
+});
+
+init();
+</script>
+</body>
+</html>

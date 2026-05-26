@@ -1,0 +1,13 @@
+node_modules/
+*.log
+*.bak
+
+# Runtime data (generated, not source)
+pending-queue.json
+jobs.log
+
+# Sensitive config
+api-keys.conf
+.env
+.env.*
+!.env.example

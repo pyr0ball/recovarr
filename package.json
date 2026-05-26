@@ -1,0 +1,14 @@
+{
+  "name": "recovarr",
+  "version": "0.1.0",
+  "description": "Web UI for re-triggering Sonarr/Radarr imports on corrupted or missing media files",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "GPL-3.0",
+  "dependencies": {}
+}
