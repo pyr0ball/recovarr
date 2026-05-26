@@ -1,29 +1,57 @@
-# Recovarr
+<div align="center">
 
-> Web UI for re-triggering Sonarr/Radarr imports on corrupted or missing media files.
+# 🔁 Recovarr
 
-Recovarr queues file paths for `recovarr.sh`, streams live script output via Server-Sent Events (SSE), polls Sonarr/Radarr for import completion, and auto-unmonitors episodes/movies once the download lands.
+**Re-trigger Sonarr and Radarr imports for corrupted or missing media — with a live log and auto-unmonitor.**
 
----
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
+[![No npm deps](https://img.shields.io/badge/npm%20deps-none-lightgrey.svg)](#install)
 
-## What it does
-
-Given a path to a corrupted or missing media file, Recovarr:
-
-1. Identifies the media in Sonarr (TV) or Radarr (Movies) via the parse API
-2. Checks the download queue for a pending import
-3. Checks download history to see if the original torrent is still available
-4. If available: deletes the file record and triggers an import scan
-5. If not available: deletes the file record and triggers an automatic search
-6. Polls every 30s until the import completes, then auto-unmonitors
+</div>
 
 ---
 
-## Requirements
+Recovarr is a minimal Node.js web UI that queues corrupted or missing file paths for recovery, streams the live recovery log to your browser, polls Sonarr or Radarr until the import completes, and then automatically unmonitors the episode or movie so your curation stays clean.
 
-- Node.js 18+
-- Bash 4+, curl, jq (for `recovarr.sh`)
-- No npm dependencies — pure Node.js built-ins only
+No npm packages. No config files to edit by hand. Just Node.js, Bash, curl, and jq.
+
+---
+
+## What happens when you recover a file
+
+1. Identify the media in Sonarr (TV) or Radarr (Movies) via the parse API
+2. Check the download queue for a pending import
+3. Check download history to see if the original torrent is still seeding
+4. **If still available:** delete the file record and trigger an import scan
+5. **If not available:** delete the file record and trigger an automatic search
+6. Poll every 30 seconds until the download lands
+7. Auto-unmonitor the episode or movie once the import confirms
+
+---
+
+## Quick start
+
+```bash
+git clone https://git.opensourcesolarpunk.com/Circuit-Forge/recovarr
+cd recovarr
+
+# Set up your API keys
+mkdir -p ~/.config/media-postprocessor
+cat > ~/.config/media-postprocessor/api-keys.conf <<EOF
+SONARR_URL=http://your-sonarr-host:8989/sonarr
+SONARR_API_KEY=your-sonarr-api-key
+RADARR_URL=http://your-radarr-host:7878/radarr
+RADARR_API_KEY=your-radarr-api-key
+QBIT_USER=admin
+QBIT_PASS=your-password
+EOF
+
+# Run
+node server.js
+```
+
+Open `http://localhost:8602`, paste one or more file paths, and click **Recover**.
 
 ---
 
@@ -34,59 +62,78 @@ git clone https://git.opensourcesolarpunk.com/Circuit-Forge/recovarr
 cd recovarr
 ```
 
-### Config
-
-```bash
-mkdir -p ~/.config/media-postprocessor
-cat > ~/.config/media-postprocessor/api-keys.conf <<EOF
-SONARR_URL=http://your-sonarr-host:8989/sonarr
-SONARR_API_KEY=your-sonarr-api-key
-RADARR_URL=http://your-radarr-host:7878/radarr
-RADARR_API_KEY=your-radarr-api-key
-QBIT_USER=admin
-QBIT_PASS=adminadmin
-EOF
-```
+Requirements: Node.js 18+, Bash 4+, curl, jq.
 
 ---
 
-## Run
+## Config
 
-```bash
-node server.js
-# or with overrides:
-PORT=8602 ARR_RECOVER_SCRIPT=/path/to/recovarr.sh node server.js
-```
+All config lives in `~/.config/media-postprocessor/api-keys.conf`. Every key can also be set as an environment variable.
 
-Open `http://localhost:8602` in your browser. Paste one or more file paths and click **Recover**.
-
----
-
-## Environment variables
+### Environment variables
 
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `8602` | Web UI port |
 | `ARR_RECOVER_CONFIG` | `~/.config/media-postprocessor/api-keys.conf` | Config file path |
-| `ARR_RECOVER_SCRIPT` | `./recovarr.sh` | Path to the recovarr.sh script |
+| `ARR_RECOVER_SCRIPT` | `./recovarr.sh` | Path to the recovery script |
 | `ARR_RECOVER_LOG` | `~/.local/share/recovarr/jobs.log` | Job log path |
 | `ARR_RECOVER_QUEUE` | `~/.local/share/recovarr/pending-queue.json` | Pending queue path |
 
 ---
 
-## API
+## CLI usage
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/recover` | Queue file paths `{ paths: ["/path/to/file"] }` |
-| `GET` | `/api/jobs` | List all jobs |
-| `GET` | `/api/jobs/:id` | Get job detail + log lines |
-| `GET` | `/api/jobs/:id/stream` | SSE stream of live log output |
-| `POST` | `/api/jobs/:id/retry` | Retry a failed job |
-| `DELETE` | `/api/jobs/:id` | Delete a job (`?force=true` to cancel active) |
+`recovarr.sh` can also be run directly without the web UI:
+
+```bash
+# Recover a single file
+./recovarr.sh /path/to/corrupted/file.mkv
+
+# Dry run — show what would happen without making changes
+./recovarr.sh /path/to/file.mkv --dry-run
+
+# Force Sonarr or Radarr (override path detection)
+./recovarr.sh /path/to/file.mkv --sonarr
+./recovarr.sh /path/to/file.mkv --radarr
+
+# Batch recover from a file list (one path per line)
+./recovarr.sh --batch paths.txt
+
+# Verbose API output
+./recovarr.sh /path/to/file.mkv --verbose
+
+# Skip availability check and go straight to triggering a search
+./recovarr.sh /path/to/file.mkv --search-only
+```
 
 ---
 
+## API
+
+The web UI communicates with this API. Useful for scripting or integration with other tools.
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/recover` | Queue paths: `{ "paths": ["/path/to/file.mkv"] }` |
+| `GET` | `/api/jobs` | List all jobs |
+| `GET` | `/api/jobs/:id` | Job detail + full log |
+| `GET` | `/api/jobs/:id/stream` | SSE stream of live log output |
+| `POST` | `/api/jobs/:id/retry` | Retry a failed job |
+| `DELETE` | `/api/jobs/:id` | Delete job (`?force=true` cancels active jobs) |
+
+---
+
+## Related
+
+- [**Discarr**](https://git.opensourcesolarpunk.com/Circuit-Forge/discarr) — scan disc rips, map to Sonarr/Radarr, queue HEVC encodes
+
+---
+
+## Contributing
+
+Issues and PRs welcome. Please open an issue before starting a large change.
+
 ## License
 
-GPL-3.0
+GPL-3.0 — see [LICENSE](LICENSE).
