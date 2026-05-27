@@ -134,6 +134,10 @@ The web UI communicates with this API. Useful for scripting or integration with 
 
 Issues and PRs welcome. Please open an issue before starting a large change.
 
+## Development tooling
+
+All code in this repo is reviewed, tested, and owned by human contributors. LLM (large language model) coding tools are part of our development workflow.
+
 ## License
 
 GPL-3.0 — see [LICENSE](LICENSE).
